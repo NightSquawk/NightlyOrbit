@@ -61,10 +61,12 @@ main() {
   PACKAGETYPE=""
   APT_KEY_TYPE="" # Only for apt-based distros
   APT_SYSTEMCTL_START=false # Only needs to be true for Kali
-  TRACK="${TRACK:-stable}"
+
+  # Get track from command-line argument, default to "stable"
+  TRACK="${1:-stable}"
 
   case "$TRACK" in
-    stable|unstable)
+    stable|development)
       ;;
     *)
       echo "unsupported track $TRACK"
@@ -188,9 +190,9 @@ main() {
   case "$OS" in
     ubuntu|debian|raspbian|centos|oracle|rhel|amazon-linux|opensuse|photon)
       # Check with the package server whether a given version is supported.
-      repo_raw="${repo_raw}/${dependencies_dir}/${OS}-${VERSION}-${ARCH}/base.sh"
-      echo -e "\nChecking $repo_raw\n"
-      URL="https://pkgs.tailscale.com/$TRACK/$OS/$VERSION/installer-supported"
+      URL="${repo_raw}/${dependencies_dir}/${OS}-${VERSION}-${ARCH}/"
+
+      echo -e "\nChecking $URL\n"
       $CURL "$URL" 2> /dev/null | grep -q OK || OS_UNSUPPORTED=1
       ;;
     other-linux)
@@ -204,18 +206,17 @@ main() {
     case "$OS" in
       other-linux)
         echo "Couldn't determine what kind of Linux is running."
-        echo "You could try the static binaries at:"
-        echo "https://pkgs.tailscale.com/$TRACK/#static"
         ;;
       "")
         echo "Couldn't determine what operating system you're running."
         ;;
       *)
+#        clear
         echo "$OS $VERSION isn't supported by this script yet."
         ;;
     esac
     echo
-    echo "If you'd like us to support your system better, please email support@tailscale.com"
+    echo "If you'd like us to support your system better, please open an issue on GitHub"
     echo "and tell us what OS you're running."
     echo
     echo "Please include the following information we gathered from your system:"
