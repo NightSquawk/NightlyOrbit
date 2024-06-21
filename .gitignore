@@ -1,0 +1,43 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+config/local.js
+
+remotePM2.bat
+*/logs/
+*.log
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+!public/
+
+# production
+/build
+
+# misc
+.DS_Store
+.env.*
+clean.env
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment Variables
+.env
+.env.build
+
+.idea/
+
+.vercel
+
+# local files
+package-lock.json
