@@ -190,7 +190,7 @@ main() {
   case "$OS" in
     ubuntu|debian|raspbian|centos|oracle|rhel|amazon-linux|opensuse|photon)
       # Check with the package server whether a given version is supported.
-      URL="${repo_raw}/${dependencies_dir}/${OS}-${VERSION}-${ARCH}/"
+      URL="${repo_raw}/${dependencies_dir}/${OS}-${VERSION}-${ARCH}/supported"
 
       echo -e "\nChecking $URL\n"
       $CURL "$URL" 2> /dev/null | grep -q OK || OS_UNSUPPORTED=1
