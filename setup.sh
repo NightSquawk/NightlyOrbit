@@ -183,6 +183,7 @@ main() {
   echo "Version: $VERSION"
   echo "Package Type: $PACKAGETYPE"
   echo "Architecture: $ARCH"
+  echo "TRACK: $TRACK"
 
   # Step 2: having detected an OS we support, is it one of the
   # versions we support?
