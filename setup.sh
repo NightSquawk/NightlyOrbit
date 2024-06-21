@@ -295,6 +295,7 @@ main() {
 
       # Clone the repository
       if [[ ! -d "$repo_dir" ]]; then
+          echo "Cloning repository..."
           git clone "$repo_url" "$repo_dir"
       fi
 
@@ -304,10 +305,14 @@ main() {
       # Get the current directory
       current_dir=$(pwd)
 
+      echo "Current directory: $current_dir"
+
       # Source the base script
       if [[ -f "${dependencies_dir}/${base_script}" ]]; then
+          echo "Sourcing ${current_dir}/${dependencies_dir}/${base_script}"
           source "${dependencies_dir}/${base_script}"
       else
+          echo "Sourcing ${dependencies_dir}/${base_script}"
           echo "Error: ${base_script} not found in ${dependencies_dir}"
           exit 1
       fi
