@@ -1,0 +1,120 @@
+#!/bin/bash
+
+# ANSI Colors
+GREEN="\033[0;32m"
+YELLOW="\033[0;33m"
+CYAN="\033[0;36m"
+RED="\033[0;31m"
+RESET="\033[0m"
+
+# Default values
+DEFAULT_HOSTING_PROVIDER="DEFAULT_HOSTING_PROVIDER"
+DEFAULT_SERVER_NAME="DEFAULT_SERVER_NAME"
+
+# Function to fetch IP of a specific interface
+get_ip() {
+  ip addr show $1 | grep inet | awk '{ print $2; }' | sed 's/\/.*$//' | head -1
+}
+
+# Simplify Firewall Events
+simplify_firewall_events() {
+  while read -r line; do
+    SRC_IP=$(echo "$line" | grep -o 'SRC=[0-9]*\.[0-9]*\.[0-9]*\.[0-9]*' | sed 's/SRC=//')
+    DST_PORT=$(echo "$line" | grep -o 'DPT=[0-9]*' | sed 's/DPT=//')
+    case $DST_PORT in
+      22) SERVICE="(SSH)" ;;
+      80) SERVICE="(HTTP)" ;;
+      443) SERVICE="(HTTPS)" ;;
+      53) SERVICE="(DNS)" ;;
+      *) SERVICE="" ;;
+    esac
+    echo -e "- Blocked connection from ${SRC_IP} to port ${DST_PORT} ${SERVICE}"
+  done <<< "$1"
+}
+
+# Fetch IPs
+SERVER_ETH0_IP=$(get_ip "eth0")
+SERVER_TAIL_IP=$(get_ip "tailscale0")
+
+# Last login attempt
+LAST_LOGIN=$(last -n 1 -i | head -1 | awk '{print $1 " from " $3 " on " $4 " " $5 " " $6}')
+
+# Current User and IP
+CURRENT_USER=$(whoami)
+CURRENT_IP=$(echo "$SSH_CLIENT" | awk '{ print $1}')
+
+# Firewall events (Assuming UFW)
+UFW_LOG="/var/log/ufw.log"
+if [ -f "$UFW_LOG" ]; then
+  FIREWALL_EVENTS=$(grep "[UFW BLOCK]" $UFW_LOG | tail -5)
+else
+  FIREWALL_EVENTS=$(dmesg --level=warn,err | grep "[UFW BLOCK]" | tail -5)
+fi
+
+# Currently hosted projects
+HOSTED_PROJECTS=$(ls /home)
+
+# Source /etc/environment to load environment variables
+source /etc/environment
+
+# Environment variables for HOSTING_PROVIDER and SERVER_NAME
+HOSTING_PROVIDER="${COMMON_HOSTING_PROVIDER:-$DEFAULT_HOSTING_PROVIDER}"
+SERVER_NAME="${COMMON_SERVER_NAME:-$DEFAULT_SERVER_NAME}"
+
+# System uptime
+UPTIME_DAYS=$(expr `cat /proc/uptime | cut -d '.' -f1` / 86400)
+UPTIME_HOURS=$(expr `cat /proc/uptime | cut -d '.' -f1` % 86400 / 3600)
+UPTIME_MINUTES=$(expr `cat /proc/uptime | cut -d '.' -f1` % 3600 / 60)
+
+# Number of pending updates
+PENDING_UPDATES=$(apt list --upgradable 2>/dev/null | grep -cE '^[0-9]+ packages' || echo 0)
+
+# Public IP
+PUBLIC_IP=$(wget http://checkip.dyndns.org/ -q -O - | grep -Eo '\<[[:digit:]]{1,3}(\.[[:digit:]]{1,3}){3}\>')
+
+# Users logged in
+USERS=$(users | wc -w)
+
+# Names of users logged in
+USER_NAMES=$(who | cut -d' ' -f1)
+
+# Remaining disk space
+ROOT_REMAINING=$(df -Ph | grep -w nbd0p1 | awk '{print $4}' | tr -d '\n')
+
+# Memory usage
+MEMORY1=$(free -t -m | grep Total | awk '{print $3" MB";}')
+MEMORY2=$(free -t -m | grep "Mem" | awk '{print $2" MB"}')
+
+# Swap in used
+SWAP_USED=$(free -m | tail -n 1 | awk '{print $3 " MB"}')
+
+# Display info
+echo ""
+echo -e "${CYAN}============================================================${RESET}"
+echo -e "${GREEN}Server Information${RESET}"
+echo -e "${CYAN}============================================================${RESET}"
+echo -e "${YELLOW}Public IP:${RESET} ${GREEN}${PUBLIC_IP}${RESET}"
+echo -e "${YELLOW}Server IP:${RESET} ${GREEN}${SERVER_ETH0_IP}${RESET}"
+echo -e "${YELLOW}Server Tailnet IP:${RESET} ${GREEN}${SERVER_TAIL_IP}${RESET}"
+echo -e "${CYAN}------------------------------------------------------------${RESET}"
+echo -e "${YELLOW}This server is hosted at:${RESET} ${GREEN}${HOSTING_PROVIDER}${RESET}"
+echo -e "${YELLOW}Known as:${RESET} ${GREEN}${SERVER_NAME}${RESET}"
+echo -e "${YELLOW}Last Login Attempt:${RESET} ${RED}${LAST_LOGIN}${RESET}"
+echo -e "${YELLOW}Currently Signed in as:${RESET} ${GREEN}${CURRENT_USER}${RESET} ${YELLOW}from IP:${RESET} ${GREEN}${CURRENT_IP}${RESET}"
+echo -e "${CYAN}------------------------------------------------------------${RESET}"
+echo -e "${RED}Recent Firewall Events:${RESET}"
+simplify_firewall_events "$FIREWALL_EVENTS"
+echo -e "${CYAN}------------------------------------------------------------${RESET}"
+echo -e "${YELLOW}Currently Hosted Projects:${RESET}"
+for project in $HOSTED_PROJECTS; do
+  echo -e "* ${GREEN}${project}${RESET}"
+done
+echo -e "${CYAN}------------------------------------------------------------${RESET}"
+echo -e "${YELLOW}System Uptime:${RESET} ${GREEN}${UPTIME_DAYS} days, ${UPTIME_HOURS} hours, ${UPTIME_MINUTES} minutes${RESET}"
+echo -e "${YELLOW}Pending Updates:${RESET} ${GREEN}${PENDING_UPDATES}${RESET}"
+echo -e "${YELLOW}Users Logged In:${RESET} ${GREEN}${USERS_COUNT}${RESET} (${USER_NAMES})"
+echo -e "${YELLOW}Root Disk Remaining:${RESET} ${GREEN}${ROOT_REMAINING}${RESET}"
+echo -e "${YELLOW}Memory Usage:${RESET} ${GREEN}${MEMORY1} / ${MEMORY2}${RESET}"
+echo -e "${YELLOW}Swap in Used:${RESET} ${GREEN}${SWAP_USED}${RESET}"
+echo -e "${CYAN}============================================================${RESET}"
+echo ""

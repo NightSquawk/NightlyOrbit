@@ -76,16 +76,10 @@ main() {
 
   repo_url="https://github.com/${repo_owner}/${repo_name}"
   repo_raw="https://raw.githubusercontent.com/${repo_owner}/${repo_name}/${TRACK}"
-
   repo_dir=$(basename "$repo_url" .git)
 
-  # Expected directory structure
-  # /dependencies/base.sh or /dependencies/other/cleaner.sh
   base_script="base.sh"
   dependencies_dir="dependencies"
-  dependencies=(
-  "other/example.sh"
-  )
 
   if [ -f /etc/os-release ]; then
       # /etc/os-release populates a number of shell variables. We care about the following:
@@ -182,8 +176,9 @@ main() {
   echo "Operating System: $OS"
   echo "Version: $VERSION"
   echo "Package Type: $PACKAGETYPE"
-  echo "Architecture: $ARCH"
-  echo "TRACK: $TRACK"
+  echo -e "Architecture: $ARCH\n"
+  echo "Track: $TRACK"
+  echo "Setup: $setup_type"
 
   # Step 2: having detected an OS we support, is it one of the
   # versions we support?
@@ -193,8 +188,8 @@ main() {
       # Check with the package server whether a given version is supported.
       URL="${repo_raw}/${dependencies_dir}/${OS}-${VERSION}-${ARCH}/supported"
 
-      echo -e "\nChecking $URL\n"
-      $CURL "$URL" 2> /dev/null | grep -q OK || OS_UNSUPPORTED=1
+      echo -e "\nChecking $URL"
+      $CURL "$URL" 2> /dev/null | grep -q OK | echo -e "OS and version supported!\n" || OS_UNSUPPORTED=1
       ;;
     other-linux)
       OS_UNSUPPORTED=1
@@ -241,18 +236,10 @@ main() {
 
   # Step 3: work out if we can run privileged commands, and if so,
   # how.
-  CAN_ROOT=
-  if [ "$(id -u)" = 0 ]; then
-    CAN_ROOT=1
-  elif type sudo >/dev/null; then
-    CAN_ROOT=1
-  elif type doas >/dev/null; then
-    CAN_ROOT=1
-  fi
-  if [ "$CAN_ROOT" != "1" ]; then
+  # Check if script is running as root
+  if [ "$(id -u)" -ne 0 ]; then
     echo "This installer needs to run commands as root."
-    echo "We tried looking for 'sudo' and 'doas', but couldn't find them."
-    echo "Either re-run this script as root, or set up sudo/doas."
+    echo "Please run this script as root or using sudo."
     exit 1
   fi
 
@@ -260,7 +247,9 @@ main() {
   includeDependencies() {
       local -n deps=$1
       for script in "${deps[@]}"; do
-          source "${current_dir}/${dependencies_dir}/${script}"
+          echo -e "\n--------------------------------------------------"
+          echo -e "Sourcing ${pathDependencies}/${script} \n"
+          source "${pathDependencies}/${script}"
       done
   }
 
@@ -289,43 +278,39 @@ main() {
 
       if [[ "$type" == "default" ]]; then
           dependencies=(
-              "security/disableRootLoginPWD.sh"
-              "security/enableUFW.sh"
+              "other/example.sh"
+              "other/cleaner.sh"
           )
+      elif [[ "$type" == "custom" ]]; then
+        prompt_for_modules dependencies
       fi
+
 
       # Clone the repository
       if [[ ! -d "$repo_dir" ]]; then
           echo "Cloning repository..."
           git clone "$repo_url" "$repo_dir"
+          echo "Cloning complete."
+          clear
       fi
 
       # Navigate to the repository
       cd "$repo_dir"
 
       # Get the current directory
-      current_dir=$(pwd)
-
-      echo "Current directory: $current_dir"
+      pathDependencies="$(pwd)/${dependencies_dir}/${OS}-${VERSION}-${ARCH}"
 
       # Source the base script
-      if [[ -f "${dependencies_dir}/${base_script}" ]]; then
-          echo "Sourcing ${current_dir}/${dependencies_dir}/${base_script}"
-          source "${dependencies_dir}/${base_script}"
+      if [[ -f "${pathDependencies}/${base_script}" ]]; then
+          source "${pathDependencies}/${base_script}"
       else
-          echo "Sourcing ${dependencies_dir}/${base_script}"
-          echo "Error: ${base_script} not found in ${dependencies_dir}"
+          echo "Error: ${base_script} not found in ${pathDependencies}/}"
           exit 1
       fi
   }
 
   # Execute setup with the specified setup type
   setup "$setup_type"
-
-  # If setup_type is custom, prompt for module selection
-  if [[ "$setup_type" == "custom" ]]; then
-      prompt_for_modules dependencies
-  fi
 
   # Include dependencies
   includeDependencies dependencies
