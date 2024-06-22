@@ -74,7 +74,7 @@ main() {
       ;;
   esac
 
-  repo_url="https://github.com/${repo_owner}/${repo_name}"
+  repo_url="https://github.com/${repo_owner}/${repo_name}/"
   repo_raw="https://raw.githubusercontent.com/${repo_owner}/${repo_name}/${TRACK}"
   repo_dir=$(basename "$repo_url" .git)
 
@@ -288,8 +288,8 @@ main() {
 
       # Clone the repository
       if [[ ! -d "$repo_dir" ]]; then
-          echo "Cloning repository..."
-          git clone "$repo_url" "$repo_dir"
+          echo "Cloning repository at $repo_url $TRACK..."
+          git clone "$repo_url" "$TRACK"
           echo "Cloning complete."
           clear
       fi
