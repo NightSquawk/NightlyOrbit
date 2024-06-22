@@ -45,6 +45,7 @@ set -eu
 # bottom of the file, so that a truncated partial download doesn't end
 # up executing half a script.
 
+
 main() {
 
   # Thess variables can be modified to change the setup behavior
@@ -53,7 +54,6 @@ main() {
   repo_owner="NightSquawk"
   repo_name="NightlyOrbit"
 
-  setup_type="default"  # Change this to "custom" to select modules
 
   # DO NOT CHANGE BELOW THIS LINE
   OS=""
@@ -63,13 +63,42 @@ main() {
   APT_SYSTEMCTL_START=false # Only needs to be true for Kali
 
   # Get track from command-line argument, default to "stable"
-  TRACK="${1:-stable}"
+  TRACK="stable"
+  SETUP_TYPE="default"
+
+  # Function to display usage
+  usage() {
+      echo "Usage: $0 [-b branch] [-s setup_type]"
+      echo "  -b, --branch      Specify the branch (track), default is 'stable'"
+      echo "  -s, --setup-type  Specify the setup type, default is 'default'"
+      exit 1
+  }
+
+  # Parse arguments
+  while [[ "$#" -gt 0 ]]; do
+      case $1 in
+          -b|--branch) TRACK="$2"; shift ;;
+          -s|--setup-type) SETUP_TYPE="$2"; shift ;;
+          -h|--help) usage ;;
+          *) echo "Unknown parameter passed: $1"; usage ;;
+      esac
+      shift
+  done
 
   case "$TRACK" in
     stable|development)
       ;;
     *)
       echo "unsupported track $TRACK"
+      exit 1
+      ;;
+  esac
+
+  case "$SETUP_TYPE" in
+    default|custom)
+      ;;
+    *)
+      echo "unsupported setup type $SETUP_TYPE"
       exit 1
       ;;
   esac
@@ -178,7 +207,7 @@ main() {
   echo "Package Type: $PACKAGETYPE"
   echo -e "Architecture: $ARCH\n"
   echo "Track: $TRACK"
-  echo "Setup: $setup_type"
+  echo "Setup: $SETUP_TYPE"
 
   # Step 2: having detected an OS we support, is it one of the
   # versions we support?
@@ -279,20 +308,33 @@ main() {
       if [[ "$type" == "default" ]]; then
           dependencies=(
               "other/example.sh"
-              "other/cleaner.sh"
           )
       elif [[ "$type" == "custom" ]]; then
         prompt_for_modules dependencies
       fi
 
-
       # Clone the repository
-      if [[ ! -d "$repo_dir" ]]; then
-          echo "Cloning repository at $repo_url $TRACK..."
-          git clone "$repo_url" "$TRACK"
-          echo "Cloning complete."
-          clear
+      if [[ -d "$repo_dir" ]]; then
+          cd "$repo_dir"
+          git fetch
+          LOCAL_COMMIT=$(git rev-parse HEAD)
+          REMOTE_COMMIT=$(git rev-parse origin/"$TRACK")
+          if [[ "$LOCAL_COMMIT" != "$REMOTE_COMMIT" ]]; then
+              cd ..
+              rm -rf "$repo_dir"
+              echo "Repository is outdated. Deleting and re-cloning..."
+              git clone --branch "$TRACK" "$repo_url"
+              echo -e "Cloning complete.\n"
+          else
+              echo -e "Repository is up-to-date. Continuing...\n"
+              cd ..
+          fi
+      else
+          echo "Cloning repository at $repo_url on branch $TRACK..."
+          git clone --branch "$TRACK" "$repo_url"
+          echo -e "Cloning complete.\n"
       fi
+
 
       # Navigate to the repository
       cd "$repo_dir"
@@ -310,7 +352,7 @@ main() {
   }
 
   # Execute setup with the specified setup type
-  setup "$setup_type"
+  setup "$SETUP_TYPE"
 
   # Include dependencies
   includeDependencies dependencies
